@@ -177,7 +177,7 @@ export const createTransaction = async (options, context) => {
     }
     const eventId = eventIds.values().next().value;
 
-    const baseSuccess = 'https://www.live-ls.com/thank-you';
+    const baseSuccess = 'https://www.sparkyourinsta.com/thank-you';
     const successQueryParams = new URLSearchParams();
     successQueryParams.set('tid', shortId);
     successQueryParams.set('oid', String(order?._id ?? ''));
@@ -216,8 +216,8 @@ export const createTransaction = async (options, context) => {
             ts: new Date().toISOString()
         });
 
-        // Call backend to generate Authorize.Net token
-        const result = await createCheckout(paymentData);
+        // Call backend with credentials and payment data
+        const result = await createCheckout(paymentData, merchantCredentials);
 
         await wixData.insert('logs', {
             phase: 'createTransaction_result',
@@ -232,7 +232,7 @@ export const createTransaction = async (options, context) => {
         }
 
         // Redirect to our HTTP function which will auto-submit the POST form to Authorize.Net
-        const redirectUrl = `https://www.live-ls.com/_functions/authorizeRedirect?token=${result.token}`;
+        const redirectUrl = `https://www.sparkyourinsta.com/_functions/authorizeRedirect?token=${result.token}`;
 
         return {
             redirectUrl: redirectUrl,

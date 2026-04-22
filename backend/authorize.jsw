@@ -1,0 +1,181 @@
+import { fetch } from 'wix-fetch';
+import { getSecret } from 'wix-secrets-backend';
+
+/**
+ * Creates a hosted payment page token and returns the checkout URL + token
+ * @param {Object} params - Checkout details
+ * @param {Object} [credentials] - Optional credentials from PSP options
+ * @returns {Promise<Object>}
+ */
+export async function createCheckout(params, credentials) {
+    let API_LOGIN_ID, TRANSACTION_KEY;
+    
+    try {
+        // 1. Use passed credentials first (from Wix PSP flow)
+        // 2. Fallback to Wix Secrets Manager
+        API_LOGIN_ID = (credentials?.apiLoginId || await getSecret("apiLoginId")).trim();
+        TRANSACTION_KEY = (credentials?.transactionKey || await getSecret("transactionKey")).trim();
+    } catch (err) {
+        console.error("Error fetching Authorize.Net credentials: ", err);
+        return { success: false, error: "Failed to load payment gateway credentials. Ensure they are set in Wix Dashboard or Secrets Manager." };
+    }
+
+    const {
+        amount,
+        orderId,
+        successUrl,
+        cancelUrl = successUrl,
+        customerEmail = "",
+        customerFirstName = "",
+        customerLastName = "",
+        description = "Order Payment",
+        isSandbox = false // Default to false for production
+    } = params || {}; 
+
+    const endpoint = isSandbox 
+        ? "https://apitest.authorize.net/xml/v1/request.api" 
+        : "https://api.authorize.net/xml/v1/request.api";
+
+    const checkoutUrl = isSandbox 
+        ? "https://test.authorize.net/payment/payment" 
+        : "https://accept.authorize.net/payment/payment";
+
+    // Format amount to string with 2 decimal places
+    let formattedAmount = "0.00";
+    if (amount) {
+        const amountNum = Number(amount);
+        formattedAmount = !isNaN(amountNum) ? amountNum.toFixed(2) : "0.00";
+    }
+
+    // Safely sanitize strings to prevent crashes on undefined
+    const safeSub = (str, len) => (str ? String(str).substring(0, len) : "");
+
+    // Helper to remove null/undefined/empty string fields recursively
+    const cleanObject = (obj) => {
+        // If it's an array, clean its children but keep it as an array
+        if (Array.isArray(obj)) {
+            return obj
+                .map(item => (item && typeof item === 'object') ? cleanObject(item) : item)
+                .filter(item => item !== null && item !== undefined && item !== '');
+        }
+        
+        // If it's an object, clean its properties
+        const newObj = {};
+        Object.keys(obj).forEach(key => {
+            if (obj[key] && typeof obj[key] === 'object') {
+                const cleaned = cleanObject(obj[key]);
+                if (cleaned && Object.keys(cleaned).length > 0) newObj[key] = cleaned;
+            } else if (obj[key] !== null && obj[key] !== undefined && obj[key] !== '') {
+                newObj[key] = obj[key];
+            }
+        });
+        return newObj;
+    };
+
+    const payload = cleanObject({
+        getHostedPaymentPageRequest: {
+            merchantAuthentication: {
+                name: API_LOGIN_ID,
+                transactionKey: TRANSACTION_KEY
+            },
+            refId: safeSub(orderId || "ORD" + Date.now(), 20),
+            transactionRequest: {
+                transactionType: "authCaptureTransaction",
+                amount: formattedAmount,
+                order: {
+                    invoiceNumber: safeSub(orderId || "INV" + Date.now(), 20),
+                    description: safeSub(description, 255)
+                },
+                customer: {
+                    email: safeSub(customerEmail, 255)
+                },
+                billTo: {
+                    firstName: safeSub(customerFirstName, 50),
+                    lastName: safeSub(customerLastName, 50)
+                }
+            },
+            hostedPaymentSettings: {
+                setting: [
+                    {
+                        settingName: "hostedPaymentReturnOptions",
+                        settingValue: JSON.stringify({
+                            showReceipt: false, 
+                            url: successUrl, 
+                            urlText: "Return to Site",
+                            cancelUrl: cancelUrl, 
+                            cancelUrlText: "Cancel"
+                        })
+                    },
+                    {
+                        settingName: "hostedPaymentButtonOptions",
+                        settingValue: JSON.stringify({ text: "Pay Now" })
+                    }
+                ]
+            }
+        }
+    });
+
+    try {
+        console.log(`Authorize.Net: Sending request to ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}`);
+        console.log(`Authorize.Net: Using API Login ID: ${API_LOGIN_ID ? API_LOGIN_ID.substring(0, 4) + '****' : 'MISSING'}`);
+        
+        // Detailed payload logging for debugging (masking Transaction Key)
+        const debugPayload = JSON.parse(JSON.stringify(payload));
+        if (debugPayload.getHostedPaymentPageRequest?.merchantAuthentication?.transactionKey) {
+            debugPayload.getHostedPaymentPageRequest.merchantAuthentication.transactionKey = '****';
+        }
+        console.log("Authorize.Net Request Payload:", JSON.stringify(debugPayload, null, 2));
+
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const rawText = await response.text();
+        
+        // Clean JSON: Remove BOM (\uFEFF) and trim
+        const cleanJson = rawText.replace(/^\uFEFF/, '').trim();
+        
+        let result;
+        try {
+            result = JSON.parse(cleanJson);
+        } catch (e) {
+            console.error("Failed to parse Authorize.Net response. Raw text:", rawText);
+            throw new Error("Invalid response format from payment gateway.");
+        }
+
+        if (result.messages && result.messages.resultCode === "Error") {
+            const errorMsg = result.messages.message[0].text;
+            const errorCode = result.messages.message[0].code;
+            console.error(`Authorize.Net API Error [${errorCode}]: ${errorMsg}`);
+            
+            // Log full response for deep debugging (redact sensitive info if needed)
+            return { 
+                success: false, 
+                error: errorMsg,
+                errorCode: errorCode,
+                fullResult: result 
+            };
+        }
+
+        if (!result.token) {
+            throw new Error("No token returned from Authorize.Net.");
+        }
+
+        // URL to your HTTP function that handles the POST to Authorize.Net
+        const baseUrl = "https://www.sparkyourinsta.com";
+        const redirectUrl = `${baseUrl}/_functions/authorizeRedirect?token=${encodeURIComponent(result.token)}&isSandbox=${isSandbox}`;
+
+        return {
+            success: true,
+            token: result.token,
+            checkoutUrl: checkoutUrl,
+            redirectUrl: redirectUrl
+        };
+
+    } catch (error) {
+        console.error("Authorize.Net Connection Error:", error);
+        return { success: false, error: error.message };
+    }
+}
