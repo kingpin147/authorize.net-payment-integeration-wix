@@ -29,16 +29,11 @@ export async function createCheckout(params, credentials) {
         customerFirstName = "",
         customerLastName = "",
         description = "Order Payment",
-        isSandbox = false // Default to false for production
+        lineItems = [] // Added lineItems support
     } = params || {}; 
 
-    const endpoint = isSandbox 
-        ? "https://apitest.authorize.net/xml/v1/request.api" 
-        : "https://api.authorize.net/xml/v1/request.api";
-
-    const checkoutUrl = isSandbox 
-        ? "https://test.authorize.net/payment/payment" 
-        : "https://accept.authorize.net/payment/payment";
+    const endpoint = "https://api.authorize.net/xml/v1/request.api";
+    const checkoutUrl = "https://accept.authorize.net/payment/payment";
 
     // Format amount to string with 2 decimal places
     let formattedAmount = "0.00";
@@ -86,6 +81,15 @@ export async function createCheckout(params, credentials) {
                     invoiceNumber: safeSub(orderId || "INV" + Date.now(), 20),
                     description: safeSub(description, 255)
                 },
+                lineItems: {
+                    lineItem: lineItems.map((item, index) => ({
+                        itemId: safeSub(item.id || String(index + 1), 31),
+                        name: safeSub(item.name || "Item", 31),
+                        description: safeSub(item.description || "", 255),
+                        quantity: String(item.quantity || 1),
+                        unitPrice: Number(item.unitPrice || 0).toFixed(2)
+                    }))
+                },
                 customer: {
                     email: safeSub(customerEmail, 255)
                 },
@@ -116,7 +120,7 @@ export async function createCheckout(params, credentials) {
     });
 
     try {
-        console.log(`Authorize.Net: Sending request to ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}`);
+        console.log(`Authorize.Net: Sending request to PRODUCTION`);
         console.log(`Authorize.Net: Using API Login ID: ${API_LOGIN_ID ? API_LOGIN_ID.substring(0, 4) + '****' : 'MISSING'}`);
         
         // Detailed payload logging for debugging (masking Transaction Key)
@@ -165,7 +169,7 @@ export async function createCheckout(params, credentials) {
 
         // URL to your HTTP function that handles the POST to Authorize.Net
         const baseUrl = "https://www.sparkyourinsta.com";
-        const redirectUrl = `${baseUrl}/_functions/authorizeRedirect?token=${encodeURIComponent(result.token)}&isSandbox=${isSandbox}`;
+        const redirectUrl = `${baseUrl}/_functions/authorizeRedirect?token=${encodeURIComponent(result.token)}`;
 
         return {
             success: true,

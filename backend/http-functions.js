@@ -1,4 +1,4 @@
-import { response } from 'wix-http-functions';
+import { response, ok, badRequest } from 'wix-http-functions';
 
 // This HTTP function will handle the redirection to Authorize.net
 // URL to access: https://<your-domain>/_functions/authorizeRedirect?token=<the_token>
@@ -6,62 +6,61 @@ export function get_authorizeRedirect(request) {
     const token = request.query.token;
     
     if (!token) {
-        return response({
-            status: 400,
+        return badRequest({
             body: "Missing token parameter."
         });
     }
 
-    const isSandboxParam = request.query.isSandbox;
-    // Fix: isSandbox is true if the param is 'true'
-    const isSandbox = (isSandboxParam === 'true'); 
+    // Production-only URL
+    const actionUrl = "https://accept.authorize.net/payment/payment";
 
-    const actionUrl = isSandbox 
-        ? "https://test.authorize.net/payment/payment" 
-        : "https://accept.authorize.net/payment/payment";
-
-    // CSP-Friendly HTML (No inline styles blocks, no scripts)
-    const logoUrl = "https://static.wixstatic.com/media/4c5fc5_6b7ff53c83e74c10872eb2eecfa60466~mv2.avif";
-    
+    // High-compatibility inline styles for Wix HTTP functions
     const html = `
     <!DOCTYPE html>
-    <html>
+    <html style="background-color: #000000; margin: 0; padding: 0;">
     <head>
-        <title>Secure Payment | SparkYourInsta</title>
+        <title>Secure Payment | Spark Media</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
     </head>
-    <body style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center; margin: 0; padding: 0; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; height: 100vh;">
-        <div style="max-width: 450px; width: 90%; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.8);">
+    <body style="background-color: #000000; color: #ffffff; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center;">
+        
+        <div style="max-width: 450px; width: 90%; background-color: #111111; padding: 50px 30px; border-radius: 24px; border: 1px solid #333333; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
             
-            <div style="margin-bottom: 25px;">
-                <img src="${logoUrl}" alt="SparkYourInsta Logo" style="max-width: 180px; height: auto; margin-bottom: 15px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));">
+            <div style="margin-bottom: 30px;">
+                <h1 style="margin: 0; font-size: 36px; font-weight: 900; letter-spacing: -1px; color: #ffffff;">
+                    SPARK <span style="color: #FFD700;">MEDIA</span>
+                </h1>
+                <p style="margin: 5px 0 0 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: #888888;">
+                    Digital Advertising Agency
+                </p>
             </div>
 
-            <h2 style="color: #2d3436; margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Secure Checkout</h2>
-            <p style="color: #636e72; font-size: 16px; line-height: 1.6; margin-bottom: 35px;">
-                You're one step away! Click below to complete your payment securely via Authorize.Net.
+            <div style="height: 2px; width: 50px; background-color: #FFD700; margin: 0 auto 30px auto;"></div>
+
+            <h2 style="color: #ffffff; margin: 0 0 15px 0; font-size: 24px; font-weight: 600;">Secure Checkout</h2>
+            <p style="color: #aaaaaa; font-size: 15px; line-height: 1.6; margin-bottom: 40px;">
+                Complete your transaction securely via Authorize.Net.
             </p>
             
             <form id="authNetForm" method="POST" action="${actionUrl}">
                 <input type="hidden" name="token" value="${token}" />
-                <button type="submit" style="background: linear-gradient(to right, #00b4db, #0083b0); color: white; border: none; padding: 18px 30px; font-size: 18px; font-weight: 500; border-radius: 12px; cursor: pointer; width: 100%; transition: transform 0.2s; box-shadow: 0 4px 15px rgba(0, 180, 219, 0.3);">
-                    Continue to Payment
+                <button type="submit" style="background-color: #FFD700; color: #000000; border: none; padding: 20px 40px; font-size: 16px; font-weight: 800; border-radius: 12px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 1px; transition: background 0.3s;">
+                    COMPLETE PAYMENT
                 </button>
             </form>
             
-            <div style="margin-top: 30px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b2bec3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span style="font-size: 13px; color: #b2bec3; font-weight: 400;">Secure SSL Encrypted Connection</span>
+            <div style="margin-top: 35px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #555555;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span style="font-size: 11px; font-weight: 600; text-transform: uppercase;">SSL Encrypted</span>
             </div>
         </div>
     </body>
     </html>
     `;
 
-    return response({
-        status: 200,
+    return ok({
         headers: {
-            "Content-Type": "text/html",
+            "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-cache"
         },
         body: html
