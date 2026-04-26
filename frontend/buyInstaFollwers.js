@@ -1,6 +1,6 @@
 import wixLocation from 'wix-location';
 import wixData from 'wix-data';
-import { createCheckout } from 'backend/authorize.jsw';
+import { createTransaction } from 'backend/authorizeIntegration';
 
 /* =====================================
    GLOBAL SELECTION STORAGE
@@ -424,59 +424,79 @@ function initCheckout() {
         }
     });
 
-    // 2. Handle the final Checkout Button
-    // Verified IDs: #buyNow, #userName, #emailInput
-    $w("#buyNow").onClick(async () => {
-        
-        const username = $w("#userName").value; // Instagram Username
-        const email = $w("#emailInput").value;   // Email Address
-        const selectedPackage = $w("#packageDropdown").value;
-        
-        const activeSection = getActiveSection();
-        const amount = selectedItems[activeSection].price;
+    // 2. Handle the "Continue" button in Details state (switches to Card state)
+    $w("#buyNow").onClick(() => {
+        const username = $w("#userName").value;
+        const email = $w("#emailInput").value;
 
         if (!email || !username) {
-            console.error("Please fill in all details");
-            // Optionally add UI feedback here
+            // Simple validation feedback
+            $w("#userName").scrollTo();
             return;
         }
 
-        $w("#buyNow").label = "Processing...";
-        $w("#buyNow").disable();
+        // Switch to the new 'card' state you added
+        $w("#instaStateBox").changeState("card");
+    });
+
+    // 3. Handle the final Pay Now button in Card state
+    $w("#payNow").onClick(async () => {
+        const username = $w("#userName").value;
+        const email = $w("#emailInput").value;
+        const selectedPackage = $w("#packageDropdown").value;
+        
+        // Card Details from your new state
+        const cardNumber = $w("#cardNumber").value;
+        const cardCode = $w("#cardCvc").value;
+        const expMonth = $w("#expirationMonth").value; // Expecting MM
+        const expYear = $w("#expirationYear").value;   // Expecting YY or YYYY
+
+        const activeSection = getActiveSection();
+        const amount = selectedItems[activeSection].price;
+
+        if (!cardNumber || !cardCode || !expMonth || !expYear) {
+            console.error("Please fill in all card details");
+            return;
+        }
+
+        $w("#payNow").label = "Processing...";
+        $w("#payNow").disable();
 
         try {
-            const checkoutParams = {
+            const paymentData = {
                 amount: amount,
-                customerEmail: email,
-                customerFirstName: username, // Pass Username in FirstName
-                customerLastName: `(${email})`, // Pass Email in LastName for visibility
+                cardNumber: cardNumber,
+                expirationDate: `${expYear}-${expMonth}`, // Authorize.Net format YYYY-MM
+                cardCode: cardCode,
+                email: email,
+                firstName: username,
+                lastName: `(${email})`,
                 description: `${selectedPackage} for ${username}`,
-                orderId: "ORD-" + Date.now(),
-                lineItems: [
-                    {
-                        name: selectedPackage,
-                        unitPrice: amount,
-                        quantity: 1,
-                        description: `Section: ${activeSection}`
-                    }
-                ]
+                customerId: "CUST-" + Date.now(),
+                successUrl: "/thank-you",
+                cancelUrl: "/payment-failed" // Or wherever you'd like to track a failure
             };
 
-            const result = await createCheckout(checkoutParams);
+            const result = await createTransaction(paymentData);
 
-            if (result.success && result.redirectUrl) {
-                // Use wix-location for direct redirection
-                wixLocation.to(result.redirectUrl);
+            if (result.success) {
+                console.log("Transaction Approved:", result);
+                wixLocation.to('/thank-you');
             } else {
-                console.error("Checkout failed:", result.error);
-                $w("#buyNow").label = "Continue";
-                $w("#buyNow").enable();
+                console.error("Transaction Failed:", result.error);
+                
+                // Show the error message on the page
+                $w("#errorText").text = result.error; 
+                $w("#errorText").show();
+
+                $w("#payNow").label = "Pay Now";
+                $w("#payNow").enable();
             }
 
         } catch (err) {
             console.error("Checkout Error:", err);
-            $w("#buyNow").label = "Continue";
-            $w("#buyNow").enable();
+            $w("#payNow").label = "Pay Now";
+            $w("#payNow").enable();
         }
     });
 
@@ -488,9 +508,8 @@ function getActiveSection() {
     if (currentState === "like") return "likes";
     if (currentState === "views") return "views";
     if (currentState === "automaticLikes") return "automaticLikes";
-    if (currentState === "details") {
-        // If we are in details, we need to know which section we came from
-        // We can infer this from which selectedItems has a price
+    if (currentState === "details" || currentState === "card") {
+        // If we are in details or card, we need to know which section we came from
         if (selectedItems.followers.id) return "followers";
         if (selectedItems.likes.id) return "likes";
         if (selectedItems.views.id) return "views";

@@ -1,0 +1,554 @@
+import { fetch } from 'wix-fetch';
+import { getSecret } from 'wix-secrets-backend';
+import * as xml2js from 'xml2js';
+
+export async function createTransaction(data) {
+    
+    const apiLoginId = (await getSecret("apiLoginId")).trim();
+    const transactionKey = (await getSecret("transactionKey")).trim();
+    const apiUrl = 'https://apitest.authorize.net/xml/v1/request.api';
+
+    // const authHeader = btoa(apiLoginId + ':' + transactionKey);
+    const authHeader = Buffer.from(apiLoginId + ':' + transactionKey).toString('base64');
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + authHeader
+    };
+
+    // const amount = 19.99;
+    // const creditCardNumber = '4111111111111111';
+    // const expirationDate = '2024-04';
+    // const cvv = '123';
+
+    const payload = {
+        createTransactionRequest: {
+            merchantAuthentication: {
+                name: apiLoginId,
+                transactionKey: transactionKey
+            },
+            transactionRequest: {
+                transactionType: 'authCaptureTransaction',
+                amount: data.amount,
+                payment: {
+                    creditCard: {
+                        cardNumber: data.cardNumber,
+                        expirationDate: data.expirationDate,
+                        cardCode: data.cardCode
+                    }
+                }
+            }
+        }
+    };
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}
+
+export async function processTransaction(data) {
+    try {
+        const response = await createTransaction(data);
+        return response;
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}
+
+
+export async function createTransactionNew(data) {
+    console.log("Backend: ", data);
+    const apiLoginId = (await getSecret("apiLoginId")).trim();
+    const transactionKey = (await getSecret("transactionKey")).trim();
+    const apiUrl = 'https://api.authorize.net/xml/v1/request.api';
+
+    const authHeader = Buffer.from(apiLoginId + ':' + transactionKey).toString('base64');
+    const headers = {
+        'Content-Type': 'text/xml',
+        'Authorization': 'Basic ' + authHeader
+    };
+
+    // const xmlPayload = `
+    //     <?xml version="1.0" encoding="utf-8"?>
+    //     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    //     <merchantAuthentication>
+    //         <name>${apiLoginId}</name>
+    //         <transactionKey>${transactionKey}</transactionKey>
+    //     </merchantAuthentication>
+    //     <transactionRequest>
+    //         <transactionType>authCaptureTransaction</transactionType>
+    //         <amount>${data.amount}</amount>
+    //         <payment>
+    //         <creditCard>
+    //             <cardNumber>${data.cardNumber}</cardNumber>
+    //             <expirationDate>${data.expirationDate}</expirationDate>
+    //             <cardCode>${data.cardCode}</cardCode>
+    //         </creditCard>
+    //         </payment>
+    //     </transactionRequest>
+    //     </createTransactionRequest>
+    // `;
+
+    //     const xmlPayload = `
+    //     <?xml version="1.0" encoding="utf-8"?>
+    //     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    //     <merchantAuthentication>
+    //         <name>${apiLoginId}</name>
+    //         <transactionKey>${transactionKey}</transactionKey>
+    //     </merchantAuthentication>
+    //     <transactionRequest>
+    //         <transactionType>authCaptureTransaction</transactionType>
+    //         <amount>${data.amount}</amount>
+    //         <payment>
+    //         <creditCard>
+    //             <cardNumber>${data.cardNumber}</cardNumber>
+    //             <expirationDate>${data.expirationDate}</expirationDate>
+    //             <cardCode>${data.cardCode}</cardCode>
+    //         </creditCard>
+    //         </payment>
+    //         <billTo>
+    //             <customerId>${data.customerId}</customerId>
+    //             <firstName>${data.firstName}</firstName>
+    //             <lastName>${data.lastName}</lastName>
+    //             <address>${data.address}</address>
+    //             <city>${data.city}</city>
+    //             <state>${data.state}</state>
+    //             <zip>${data.zip}</zip>
+    //             <country>${data.country}</country>
+    //         </billTo>
+    //         <customer>
+    //             <phone>${data.phone}</phone>
+    //             <email>${data.email}</email>
+    //         </customer>
+    //     </transactionRequest>
+    //     </createTransactionRequest>
+    // `;
+
+    //     const xmlPayload = `
+    //     <?xml version="1.0" encoding="utf-8"?>
+    //     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    //     <merchantAuthentication>
+    //         <name>${apiLoginId}</name>
+    //         <transactionKey>${transactionKey}</transactionKey>
+    //     </merchantAuthentication>
+    //     <transactionRequest>
+    //         <transactionType>authCaptureTransaction</transactionType>
+    //         <amount>${data.amount}</amount>
+    //         <payment>
+    //         <creditCard>
+    //             <cardNumber>${data.cardNumber}</cardNumber>
+    //             <expirationDate>${data.expirationDate}</expirationDate>
+    //             <cardCode>${data.cardCode}</cardCode>
+    //         </creditCard>
+    //         </payment>
+    //         <billTo>
+    //             <firstName>${data.firstName}</firstName>
+    //             <lastName>${data.lastName}</lastName>
+    //             <address>${data.address}</address>
+    //             <city>${data.city}</city>
+    //             <state>${data.state}</state>
+    //             <zip>${data.zip}</zip>
+    //             <country>${data.country}</country>
+    //             <phoneNumber>${data.phone}</phoneNumber>
+    //             <email>${data.email}</email>
+    //         </billTo>
+    //     </transactionRequest>
+    //     </createTransactionRequest>
+    // `;
+
+    //     const xmlPayload1 = `
+    //     <?xml version="1.0" encoding="utf-8"?>
+    //     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+    //     <merchantAuthentication>
+    //         <name>${apiLoginId}</name>
+    //         <transactionKey>${transactionKey}</transactionKey>
+    //     </merchantAuthentication>
+    //     <transactionRequest>
+    //         <transactionType>authCaptureTransaction</transactionType>
+    //         <amount>${data.amount}</amount>
+    //         <payment>
+    //         <creditCard>
+    //             <cardNumber>${data.cardNumber}</cardNumber>
+    //             <expirationDate>${data.expirationDate}</expirationDate>
+    //             <cardCode>${data.cardCode}</cardCode>
+    //         </creditCard>
+    //         </payment>
+    //         <customer>
+    // 	  <id>39432</id>
+    // 	  <email>customer@example.com</email>
+    // 	</customer>
+    //         <order>
+    //             <customerProfileId>${data.customerId}</customerProfileId>
+    //         </order>
+    //         <billTo>
+    //             <firstName>${data.firstName}</firstName>
+    //             <lastName>${data.lastName}</lastName>
+    //             <address>${data.address}</address>
+    //             <city>${data.city}</city>
+    //             <state>${data.state}</state>
+    //             <zip>${data.zip}</zip>
+    //             <country>${data.country}</country>
+    //             <phoneNumber>${data.phone}</phoneNumber>
+    //             <email>${data.email}</email>
+    //         </billTo>
+    //     </transactionRequest>
+    //     </createTransactionRequest>
+    // `;
+
+    const xmlPayload = `<createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+  <merchantAuthentication>
+	<name>${apiLoginId}</name>
+	<transactionKey>${transactionKey}</transactionKey>
+  </merchantAuthentication>
+  <transactionRequest>
+	<transactionType>authCaptureTransaction</transactionType>
+	<amount>${data.amount}</amount>
+	<payment>
+	  <creditCard>
+		<cardNumber>${data.cardNumber}</cardNumber>
+		<expirationDate>${data.expirationDate}</expirationDate>
+		<cardCode>${data.cardCode}</cardCode>
+	  </creditCard>
+	</payment>
+	<order>
+	  <invoiceNumber>INV-${data.cardNumber}</invoiceNumber>
+	  <description>${data.firstName}</description>
+	</order>
+	<lineItems>
+	  <lineItem>
+		<itemId>${data.cardCode}</itemId>
+		<name>Instagram</name>
+		<description>Bought Instagram</description>
+		<quantity>1</quantity>
+		<unitPrice>${data.amount}</unitPrice>
+	  </lineItem>
+	</lineItems>
+	<customer>
+	  <id>${data.customerId}</id>
+	  <email>${data.email}</email>
+	</customer>
+	
+    <billTo>
+            <firstName>${data.firstName}</firstName>
+            <lastName>${data.lastName}</lastName>
+            <address>${data.address}</address>
+            <city>${data.city}</city>
+            <state>${data.state}</state>
+            <zip>${data.zip}</zip>
+            <country>${data.country}</country>
+            <phoneNumber>${data.phone}</phoneNumber>
+        </billTo>
+	<shipTo>
+	  <firstName>${data.firstName}</firstName>
+            <lastName>${data.lastName}</lastName>
+            <address>${data.address}</address>
+            <city>${data.city}</city>
+            <state>${data.state}</state>
+            <zip>${data.zip}</zip>
+            <country>${data.country}</country>
+	</shipTo>
+  </transactionRequest>
+</createTransactionRequest>`
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: headers,
+            body: xmlPayload
+        });
+
+        // Parse XML response to JSON
+        const responseText = await response.text();
+        console.log("responseText: ", responseText);
+        const responseJson = await parseXml(responseText);
+        console.log("responseText: ", responseText);
+        console.log("responseJson: ", responseJson);
+        return responseJson;
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}
+
+async function parseXml(xml) {
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const json = await parser.parseStringPromise(xml);
+    return json.createTransactionResponse;
+}
+
+// export function authorizeNetCharge(amount, creditCardNumber, expirationDate, cvv) {
+//     const apiUrl = 'https://apitest.authorize.net/xml/v1/request.api';
+//     const apiLoginId = 'REDACTED';
+//     const transactionKey = 'REDACTED';
+
+//     const requestBody = {
+//         "createTransactionRequest": {
+//             "merchantAuthentication": {
+//                 "name": apiLoginId,
+//                 "transactionKey": transactionKey
+//             },
+//             "transactionRequest": {
+//                 "transactionType": "authCaptureTransaction",
+//                 "amount": amount,
+//                 "payment": {
+//                     "creditCard": {
+//                         "cardNumber": creditCardNumber,
+//                         "expirationDate": expirationDate,
+//                         "cardCode": cvv
+//                     }
+//                 }
+//             }
+//         }
+//     };
+
+//     return fetch(apiUrl, {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//             },
+//             body: JSON.stringify(requestBody),
+//         })
+//         .then(response => response.json())
+//         .then(responseJson => {
+//             console.log("responseJson: ", responseJson);
+//             const responseCode = responseJson.transactionResponse.responseCode;
+//             const responseMessage = responseJson.transactionResponse.errors ?
+//                 responseJson.transactionResponse.errors[0].errorText :
+//                 responseJson.transactionResponse.messages[0].description;
+
+//             if (responseCode === '1') {
+//                 // Transaction was successful
+//                 const transactionId = responseJson.transactionResponse.transId;
+//                 return { success: true, transactionId };
+//             } else {
+//                 // Transaction failed
+//                 return { success: false, error: responseMessage };
+//             }
+//         })
+//         .catch(error => {
+//             console.error(error);
+//             return { success: false, error: 'An error occurred while processing the transaction.' };
+//         });
+// }
+
+// export async function createTransactionNew(data) {
+//     data = {
+//         amount: 19.99,
+//         cardNumber: "4111111111111111",
+//         expirationDate: "2024-04",
+//         cardCode: "123"
+//     }
+//     console.log("data: ", data);
+//   const apiLoginId = 'REDACTED';
+//   const transactionKey = 'REDACTED';
+//   const apiUrl = 'https://apitest.authorize.net/xml/v1/request.api';
+
+//   const authHeader = Buffer.from(apiLoginId + ':' + transactionKey).toString('base64');
+//   const headers = {
+//     'Content-Type': 'text/xml',
+//     'Authorization': 'Basic ' + authHeader
+//   };
+
+//   const xmlPayload = `
+//     <?xml version="1.0" encoding="utf-8"?>
+//     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+//       <merchantAuthentication>
+//         <name>${apiLoginId}</name>
+//         <transactionKey>${transactionKey}</transactionKey>
+//       </merchantAuthentication>
+//       <transactionRequest>
+//         <transactionType>authCaptureTransaction</transactionType>
+//         <amount>${data.amount}</amount>
+//         <payment>
+//           <creditCard>
+//             <cardNumber>${data.cardNumber}</cardNumber>
+//             <expirationDate>${data.expirationDate}</expirationDate>
+//             <cardCode>${data.cardCode}</cardCode>
+//           </creditCard>
+//         </payment>
+//       </transactionRequest>
+//     </createTransactionRequest>
+//   `;
+
+//   try {
+//     const response = await fetch(apiUrl, {
+//       method: 'POST',
+//       headers: headers,
+//       body: xmlPayload
+//     });
+
+//     // Parse XML response to JSON
+//     const responseText = await response.text();
+//     const responseJson = xml2js.xml2js(responseText, {compact: true});
+
+//     return responseJson;
+//   } catch (error) {
+//     console.error('Error:', error);
+//     return null;
+//   }
+// }
+// Tis updated code sends the request as an XML payload and parses the XML response back to JSON format for easy handling in your application. This should resolve the "Unexpected to
+
+// export async function createTransactionNew(data) {
+//     data = {
+//         amount: 29.99,
+//         cardNumber: "4242424242424242",
+//         expirationDate: "2024-04",
+//         cardCode: "123"
+//     }
+//     const apiLoginId = 'REDACTED';
+//     const transactionKey = 'REDACTED';
+//     const apiUrl = 'https://apitest.authorize.net/xml/v1/request.api';
+
+//     const authHeader = Buffer.from(apiLoginId + ':' + transactionKey).toString('base64');
+//     const headers = {
+//         'Content-Type': 'text/xml',
+//         'Authorization': 'Basic ' + authHeader
+//     };
+
+//     const xmlPayload = `
+//     <?xml version="1.0" encoding="utf-8"?>
+//     <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+//       <merchantAuthentication>
+//         <name>${apiLoginId}</name>
+//         <transactionKey>${transactionKey}</transactionKey>
+//       </merchantAuthentication>
+//       <transactionRequest>
+//         <transactionType>authCaptureTransaction</transactionType>
+//         <amount>${data.amount}</amount>
+//         <payment>
+//           <creditCard>
+//             <cardNumber>${data.cardNumber}</cardNumber>
+//             <expirationDate>${data.expirationDate}</expirationDate>
+//             <cardCode>${data.cardCode}</cardCode>
+//           </creditCard>
+//         </payment>
+//       </transactionRequest>
+//     </createTransactionRequest>
+//   `;
+
+//     try {
+//         const response = await fetch(apiUrl, {
+//             method: 'POST',
+//             headers: headers,
+//             body: xmlPayload
+//         });
+
+//         // Parse XML response to JSON
+//         const responseText = await response.text();
+//         console.log("responseText: ", responseText);
+//         const responseJson = parseXml(responseText);
+//         console.log("responseJson: ", responseJson);
+
+//         return responseJson;
+//     } catch (error) {
+//         console.error('Error:', error);
+//         return null;
+//     }
+// }
+
+// function parseXml(xml) {
+//     const regex = /<(\w+)[^>]*>(.*?)<\/\1>/g;
+//     const json = {};
+
+//     let match = regex.exec(xml);
+//     while (match) {
+//         const [, key, value] = match;
+//         json[key] = /^\d+(\.\d+)?$/.test(value) ? parseFloat(value) : value;
+//         match = regex.exec(xml);
+//     }
+
+//     return json;
+// }
+
+// export async function createTransactionNew(data) {
+//     data = {
+//         amount: 29.99,
+//         cardNumber: "4111111111111111",
+//         expirationDate: "2024-04",
+//         cardCode: "123"
+//     }
+//     const createTransactionRequest = {
+//         "createTransactionRequest": {
+//             "merchantAuthentication": {
+//                 "name": "REDACTED",
+//                 "transactionKey": "REDACTED"
+//             },
+//             "transactionRequest": {
+//                 "transactionType": "authCaptureTransaction",
+//                 "amount": "20",
+//                 "payment": {
+//                     "creditCard": {
+//                         "cardNumber": "4111111111111111",
+//                         "expirationDate": "1230",
+//                         "cardCode": "123"
+//                     }
+//                 }
+//             }
+//         }
+//     };
+
+//     const options = {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify(createTransactionRequest)
+//     };
+
+//     fetch('https://apitest.authorize.net/xml/v1/request.api', options)
+//         .then(response => response.json())
+//         .then(responseJson => {
+//             console.log('responseJson: ', responseJson);
+//         })
+//         .catch(error => {
+//             console.error('Error: ', error);
+//         });
+// }
+
+// export async function createTransactionNew(data) {
+//   const apiLoginId = 'REDACTED';
+//   const transactionKey = 'REDACTED';
+//   const apiUrl = 'https://apitest.authorize.net/rest/v1/transactions/charge';
+
+//   const authHeader = Buffer.from(apiLoginId + ':' + transactionKey).toString('base64');
+//   const headers = {
+//     'Content-Type': 'application/json',
+//     'Authorization': 'Basic ' + authHeader
+//   };
+
+//   const payload = {
+//     amount: data.amount,
+//     payment: {
+//       creditCard: {
+//         cardNumber: data.cardNumber,
+//         expirationDate: data.expirationDate,
+//         cardCode: data.cardCode
+//       }
+//     }
+//   };
+
+//   try {
+//     const response = await fetch(apiUrl, {
+//       method: 'POST',
+//       headers: headers,
+//       body: JSON.stringify(payload)
+//     });
+
+//     const responseJson = await response.json();
+
+//     return responseJson;
+//   } catch (error) {
+//     console.error('Error:', error);
+//     return null;
+//   }
+// }

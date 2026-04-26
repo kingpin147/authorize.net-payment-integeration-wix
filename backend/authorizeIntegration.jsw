@@ -1,0 +1,177 @@
+    import { fetch } from 'wix-fetch';
+    import { getSecret } from 'wix-secrets-backend';
+    import wixData from 'wix-data';
+    import * as xml2js from 'xml2js';
+
+    /**
+    * Consolidated Authorize.Net Integration Service
+    * Merges the robustness of the original authorize.jsw with the 
+    * XML-based Direct API approach from newAuthorize.jsw.
+    * 
+    * This implementation uses xml2js for response parsing as requested.
+    */
+
+    // Toggle this based on environment (Production vs Sandbox)
+    const API_URL = 'https://api.authorize.net/xml/v1/request.api'; 
+    // const API_URL = 'https://apitest.authorize.net/xml/v1/request.api';
+
+    /**
+    * Processes a direct credit card transaction
+    * @param {Object} data - Transaction and customer details
+    * @returns {Promise<Object>} The parsed response from Authorize.Net
+    */
+    export async function createTransaction(data) {
+        try {
+            // 1. Fetch credentials from Wix Secrets
+            const apiLoginId = (await getSecret("apiLoginId")).trim();
+            const transactionKey = (await getSecret("transactionKey")).trim();
+
+            if (!apiLoginId || !transactionKey) {
+                throw new Error("Missing Authorize.Net credentials in Secrets Manager.");
+            }
+
+            // 1.5 Log the start of the transaction (DO NOT log card details)
+            await wixData.insert('logs', {
+                phase: 'transaction_initiated',
+                amount: data.amount,
+                email: data.email,
+                description: data.description,
+                timestamp: new Date().toISOString()
+            });
+
+            // 2. Prepare headers
+            const authHeader = Buffer.from(`${apiLoginId}:${transactionKey}`).toString('base64');
+            const headers = {
+                'Content-Type': 'text/xml',
+                'Authorization': 'Basic ' + authHeader
+            };
+
+            // 3. Construct XML Payload
+            const xmlPayload = `
+    <createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+        <merchantAuthentication>
+            <name>${apiLoginId}</name>
+            <transactionKey>${transactionKey}</transactionKey>
+        </merchantAuthentication>
+        <transactionRequest>
+            <transactionType>authCaptureTransaction</transactionType>
+            <amount>${Number(data.amount).toFixed(2)}</amount>
+            <payment>
+                <creditCard>
+                    <cardNumber>${data.cardNumber}</cardNumber>
+                    <expirationDate>${data.expirationDate}</expirationDate>
+                    <cardCode>${data.cardCode}</cardCode>
+                </creditCard>
+            </payment>
+            <order>
+                <invoiceNumber>${safeSub(data.invoiceNumber || 'INV-' + Date.now(), 20)}</invoiceNumber>
+                <description>${safeSub(data.description || 'Order Payment', 255)}</description>
+            </order>
+            <lineItems>
+                ${(data.lineItems || []).map(item => `
+                <lineItem>
+                    <itemId>${safeSub(item.id, 31)}</itemId>
+                    <name>${safeSub(item.name, 31)}</name>
+                    <description>${safeSub(item.description, 255)}</description>
+                    <quantity>${item.quantity || 1}</quantity>
+                    <unitPrice>${Number(item.unitPrice || 0).toFixed(2)}</unitPrice>
+                </lineItem>`).join('')}
+            </lineItems>
+            <customer>
+                <id>${safeSub(data.customerId, 20)}</id>
+                <email>${safeSub(data.email, 255)}</email>
+            </customer>
+            <billTo>
+                <firstName>${safeSub(data.firstName, 50)}</firstName>
+                <lastName>${safeSub(data.lastName, 50)}</lastName>
+                <address>${safeSub(data.address, 60)}</address>
+                <city>${safeSub(data.city, 40)}</city>
+                <state>${safeSub(data.state, 40)}</state>
+                <zip>${safeSub(data.zip, 20)}</zip>
+                <country>${safeSub(data.country || 'US', 60)}</country>
+                <phoneNumber>${safeSub(data.phone, 25)}</phoneNumber>
+            </billTo>
+            <shipTo>
+                <firstName>${safeSub(data.firstName, 50)}</firstName>
+                <lastName>${safeSub(data.lastName, 50)}</lastName>
+                <address>${safeSub(data.address, 60)}</address>
+                <city>${safeSub(data.city, 40)}</city>
+                <state>${safeSub(data.state, 40)}</state>
+                <zip>${safeSub(data.zip, 20)}</zip>
+                <country>${safeSub(data.country || 'US', 60)}</country>
+            </shipTo>
+        </transactionRequest>
+    </createTransactionRequest>`.trim();
+
+            // 4. Send Request
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: headers,
+                body: xmlPayload
+            });
+
+            // 5. Parse Response
+            const responseText = await response.text();
+            const responseJson = await parseXml(responseText);
+
+            console.log("Authorize.Net Response:", JSON.stringify(responseJson, null, 2));
+            
+            const isApproved = responseJson?.messages?.resultCode === "Ok" && responseJson?.transactionResponse?.responseCode === "1";
+            
+            // Log the result to the DB
+            await wixData.insert('logs', {
+                phase: 'transaction_result',
+                success: isApproved,
+                resultCode: responseJson?.messages?.resultCode,
+                responseCode: responseJson?.transactionResponse?.responseCode,
+                transId: responseJson?.transactionResponse?.transId,
+                error: isApproved ? null : (responseJson?.transactionResponse?.errors?.error?.errorText || responseJson?.messages?.message?.text),
+                timestamp: new Date().toISOString()
+            });
+
+            // Log the tracking URLs if they exist
+            if (data.successUrl || data.cancelUrl) {
+                console.log(`Tracking URLs - Success: ${data.successUrl}, Cancel: ${data.cancelUrl}`);
+            }
+
+            return {
+                success: isApproved,
+                data: responseJson,
+                error: isApproved ? null : (responseJson?.transactionResponse?.errors?.error?.errorText || responseJson?.messages?.message?.text || "Transaction failed")
+            };
+
+        } catch (error) {
+            console.error('AuthorizeIntegration Error:', error);
+            
+            // Log fatal errors to the DB
+            await wixData.insert('logs', {
+                phase: 'transaction_exception',
+                error: error.message,
+                timestamp: new Date().toISOString()
+            });
+
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+    * Utility to parse XML response to JSON
+    * @param {string} xml - Raw XML string
+    */
+    async function parseXml(xml) {
+        const parser = new xml2js.Parser({ 
+            explicitArray: false, 
+            ignoreAttrs: true,
+            tagNameProcessors: [xml2js.processors.stripPrefix] 
+        });
+        const result = await parser.parseStringPromise(xml);
+        // Return the main response object (usually createTransactionResponse)
+        return result.createTransactionResponse || result;
+    }
+
+    /**
+    * Safe substring helper to prevent API errors on field lengths
+    */
+    function safeSub(str, len) {
+        return str ? String(str).substring(0, len) : "";
+    }

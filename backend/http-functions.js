@@ -1,4 +1,5 @@
 import { response, ok, badRequest } from 'wix-http-functions';
+import wixData from 'wix-data';
 
 // This HTTP function will handle the redirection to Authorize.net
 // URL to access: https://<your-domain>/_functions/authorizeRedirect?token=<the_token>
@@ -65,4 +66,30 @@ export function get_authorizeRedirect(request) {
         },
         body: html
     });
+}
+
+/**
+ * Authorize.Net Webhook Handler
+ * URL: https://<your-domain>/_functions/authorizeWebhook
+ */
+export async function post_authorizeWebhook(request) {
+    try {
+        const payload = await request.body.json();
+        console.log("Authorize.Net Webhook Received:", JSON.stringify(payload, null, 2));
+
+        // Log the webhook to a collection for debugging/audit
+        await wixData.insert("logs", {
+            phase: "authorize_webhook",
+            data: payload,
+            ts: new Date().toISOString()
+        });
+
+        // Here you can add logic to update orders, send emails, etc.
+        // based on payload.eventType (e.g., net.authorize.payment.authcapture.created)
+
+        return ok();
+    } catch (err) {
+        console.error("Authorize.Net Webhook Error:", err);
+        return badRequest({ body: "Webhook processing failed" });
+    }
 }
