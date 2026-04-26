@@ -1,52 +1,61 @@
-# Authorize.Net Wix Velo Integration (Direct Checkout)
+# Authorize.Net Wix Velo Integration (Direct On-Site Checkout)
 
-A robust, production-ready integration for Authorize.Net (Accept Hosted flow) within the Wix Velo environment. This implementation bypasses the standard Wix Payment plugin for a faster, direct redirection flow.
-
-## 🚀 Overview
-
-This integration allows your Wix site to securely accept payments via Authorize.Net using the **Accept Hosted** flow. Customers are redirected to a secure, Authorize.Net-hosted payment page via a branded bridge page that handles the necessary security protocols.
-
-### Key Features
-- **Direct Frontend Redirection**: Uses `wix-location` for a seamless transition from your custom multi-state checkout form.
-- **Agency-Branded Bridge Page**: A high-performance, colorful bridge page (Spark Media) that handles the secure POST to Authorize.Net without broken images.
-- **Line Item Support**: Pass detailed order information (package name, price, quantity) directly to the payment gateway.
-- **Custom Field Mapping**: Automatically maps Instagram Usernames and Emails to Authorize.Net customer fields for easy order management.
-- **Dynamic Environment Toggling**: Easily switch between Sandbox and Production.
+A high-performance, production-ready integration for Authorize.Net within the Wix Velo environment. This project evolved from a redirect-based system to a fully integrated, on-site payment experience.
 
 ---
 
-## 📂 Project Structure
+## 🚀 Project Evolution
 
-- `frontend/buyInstaFollwers.js`: The main frontend logic for package selection and initiating the direct checkout.
-- `backend/authorize.jsw`: The core backend logic for generating Authorize.Net tokens and line item formatting.
-- `backend/http-functions.js`: The "bridge" endpoint (`_functions/authorizeRedirect`) that provides a premium agency-styled redirection page.
+### Scenario 1: The Redirect Method (Legacy)
+Initially, the project used the **Authorize.Net Accept Hosted** flow. 
+- **How it worked:** Users were redirected to a secure Authorize.Net-hosted page via a custom "bridge" page (`_functions/authorizeRedirect`).
+- **Why it changed:** The client felt that redirecting users to a third-party domain (even for security) broke the premium brand experience and decreased conversion rates.
+
+### Scenario 2: The Direct Method (Final Choice)
+We implemented a **Direct API (AIM/XML)** integration that allows the entire transaction to happen on the website.
+- **How it works:** A multi-state checkout box collects customer details and card information. The data is sent securely to the Wix backend, processed via Authorize.Net's Direct XML API, and a success/fail response is shown instantly.
+- **Result:** **This is what the client finally liked.** It provides a seamless, professional experience where the customer never leaves the `sparkyourinsta.com` domain.
 
 ---
 
-## 🛠️ Setup Instructions
+## 📂 Key Components
 
-### 1. Configure Secrets
-Add the following secrets to your **Wix Secret Manager**:
-- `apiLoginId`: Your Authorize.Net API Login ID.
-- `transactionKey`: Your Authorize.Net Transaction Key.
+- **`frontend/buyInstaFollwers.js`**: Controls the multi-state checkout UI (Package Selection -> Details -> Card Info). Handles frontend validation and error display.
+- **`backend/authorizeIntegration.jsw`**: The consolidated backend service. It handles XML payload construction, `xml2js` response parsing, and database logging.
+- **`backend/payment.jsw`**: A legacy wrapper used for testing direct transactions.
 
-### 2. Configure Element IDs
-Ensure your Wix Page contains a **Multi-State Box** with a `details` state containing:
-- Input ID `#userName`: For the Instagram Username.
-- Input ID `#emailInput`: For the customer email.
-- Button ID `#buyNow`: To trigger the payment.
-- Dropdown ID `#packageDropdown`: For package selection.
+---
 
-### 3. Update Site Domain
-In `backend/authorize.jsw`, update the `baseUrl` variable to match your live domain:
-```javascript
-const baseUrl = "https://www.sparkyourinsta.com";
-```
+## 🛠️ Technical Features
 
-### 4. Publish Your Site
-For the `_functions/authorizeRedirect` bridge page to work, you **must publish your site**.
+- **On-Site Payment Form**: Custom UI for Card Number, CVC, and Expiration Date inside a Wix Multi-State Box.
+- **Robust Error Handling**: Real-time feedback for declines, expired cards, or incorrect CVCs displayed via the `#errorText` element.
+- **Database Logging**: Every step (Initiated, Result, Exception) is logged to a `logs` CMS collection for audit trails and customer support.
+- **PCI Security**: Sensitive card data is processed but **never saved** to the database, ensuring security and compliance.
+- **Production Endpoint**: Configured for `api.authorize.net` with live environment toggling.
+
+---
+
+## ⚙️ Setup & Configuration
+
+### 1. Wix Secret Manager
+The following production credentials must be stored:
+- `apiLoginId`: Your Live Authorize.Net API Login ID.
+- `transactionKey`: Your Live Authorize.Net Transaction Key.
+
+### 2. UI Element IDs
+The `buyInstaFollwers.js` logic expects the following IDs in the Wix Editor:
+- **Details State:** `#userName`, `#emailInput`, `#buyNow` (Continue button).
+- **Card State:** `#cardNumber`, `#cardCvc`, `#expirationMonth`, `#expirationYear`, `#payNow`.
+- **Feedback:** `#errorText` (Text element for decline messages).
+
+### 3. Workflow Flow
+1. **Selection:** User picks a package in the repeater.
+2. **Details:** User enters Instagram handle and email.
+3. **Payment:** User enters card details on the same page.
+4. **Completion:** On success, the user is instantly redirected to `/thank-you`.
 
 ---
 
 ## ⚖️ License
-MIT
+MIT - Spark Media Integration
