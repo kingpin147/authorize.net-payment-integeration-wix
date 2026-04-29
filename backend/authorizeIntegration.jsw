@@ -131,7 +131,7 @@
 
             // Log the tracking URLs if they exist
             if (data.successUrl || data.cancelUrl) {
-                console.log(`Tracking URLs - Success: ${data.successUrl}, Cancel: ${data.cancelUrl}`);
+                console.log(`Tracking URLs:\nSuccess URL: ${data.successUrl}\nCancel URL: ${data.cancelUrl}`);
             }
 
             return {

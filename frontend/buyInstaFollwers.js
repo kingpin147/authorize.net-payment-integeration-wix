@@ -1,4 +1,4 @@
-import wixLocation from 'wix-location';
+ import wixLocationFrontend from 'wix-location-frontend';
 import wixData from 'wix-data';
 import { createTransaction } from 'backend/authorizeIntegration';
 
@@ -101,7 +101,7 @@ function initButtons() {
 
 function detectStateFromURL() {
 
-    const url = wixLocation.url.toLowerCase();
+    const url = wixLocationFrontend.url.toLowerCase();
 
     if (url.includes("followers")) activateSection("followers");
     else if (url.includes("automatic-likes")) activateSection("automaticLikes");
@@ -114,30 +114,24 @@ function detectStateFromURL() {
 function activateSection(type) {
 
     resetButtons();
-
+    console.log(type, 'TYPE')
     if (type === "followers") {
 
         $w("#instaStateBox").changeState("followers");
         setActive("#btnFollowers");
 
-    }
-
-    else if (type === "likes") {
+    } else if (type === "likes") {
 
         $w("#instaStateBox").changeState("like");
         setActive("#btnLikes");
 
-    }
-
-    else if (type === "views") {
+    } else if (type === "views") {
 
         $w("#instaStateBox").changeState("views");
         setActive("#btnViews");
 
-    }
-
-    else if (type === "automaticLikes") {
-
+    } else if (type === "automaticLikes") {
+        console.log('yes')
         $w("#instaStateBox").changeState("automaticLikes");
 
     }
@@ -198,7 +192,9 @@ function setupRepeater(type) {
             setSelected(type, itemData);
             refreshRepeaterSelection(type);
             updatePriceUI(type);
-
+$w('#DiscountedPriceDetails').text=itemData.discountedPrice.toString()
+$w('#actualPriceDetails').text=itemData.price.toString()
+$w('#saveTextDetails').text=itemData.discountedPrice.toString()
         });
 
     });
@@ -239,14 +235,14 @@ function refreshRepeaterSelection(type) {
 
 function highlightItemUI($item, config) {
 
-  //  $item(config.container).style.backgroundColor = "#FFD000";
+    //  $item(config.container).style.backgroundColor = "#FFD000";
     $item(config.tick).show();
 
 }
 
 function resetItemUI($item, config) {
 
-   // $item(config.container).style.backgroundColor = "#FFFFFF";
+    // $item(config.container).style.backgroundColor = "#FFFFFF";
     $item(config.tick).hide();
 
 }
@@ -269,6 +265,11 @@ function updatePriceUI(type) {
     $w(config.discounted).text = `$${price.toFixed(2)}`;
     $w(config.original).text = `$${original.toFixed(2)}`;
     $w(config.save).text = `You Save $${savings}`;
+    $w('#DiscountedPriceDetails').text=`$${price.toFixed(2)}`;
+$w('#actualPriceDetails').text=`$${original.toFixed(2)}`;
+$w('#saveTextDetails').text=`You Save $${savings}`;
+ 
+
 
 }
 
@@ -313,10 +314,10 @@ function loadPackagesFromRepeater(type) {
 
     }
 
-  const options = items.map(item => ({
-    label: `${item.package}➡$${Number(item.discountedPrice).toFixed(2)}`,
-    value: item.package
-}));
+    const options = items.map(item => ({
+        label: `${item.package}➡$${Number(item.discountedPrice).toFixed(2)}`,
+        value: item.package
+    }));
 
     $w("#packageDropdown").options = options;
 
@@ -412,7 +413,7 @@ function initCheckout() {
     $w("#packageDropdown").onChange(() => {
         const selectedValue = $w("#packageDropdown").value;
         const activeSection = getActiveSection();
-        
+
         // Update the selectedItems with the new price from the dataset
         const config = repeaterConfig[activeSection];
         const allItems = $w(config.repeater).data;
@@ -444,12 +445,12 @@ function initCheckout() {
         const username = $w("#userName").value;
         const email = $w("#emailInput").value;
         const selectedPackage = $w("#packageDropdown").value;
-        
+
         // Card Details from your new state
         const cardNumber = $w("#cardNumber").value;
         const cardCode = $w("#cardCvc").value;
         const expMonth = $w("#expirationMonth").value; // Expecting MM
-        const expYear = $w("#expirationYear").value;   // Expecting YY or YYYY
+        const expYear = $w("#expirationYear").value; // Expecting YY or YYYY
 
         const activeSection = getActiveSection();
         const amount = selectedItems[activeSection].price;
@@ -463,6 +464,11 @@ function initCheckout() {
         $w("#payNow").disable();
 
         try {
+            //https://www.sparkyourinsta.com/thank-you
+            const descriptionText = `${selectedPackage} for ${username}`;
+            const successUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&status=success`;
+            const cancelUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&status=failed`;
+
             const paymentData = {
                 amount: amount,
                 cardNumber: cardNumber,
@@ -471,22 +477,27 @@ function initCheckout() {
                 email: email,
                 firstName: username,
                 lastName: `(${email})`,
-                description: `${selectedPackage} for ${username}`,
+                description: descriptionText,
                 customerId: "CUST-" + Date.now(),
-                successUrl: "/thank-you",
-                cancelUrl: "/payment-failed" // Or wherever you'd like to track a failure
+                successUrl: successUrl,
+                cancelUrl: cancelUrl
             };
 
             const result = await createTransaction(paymentData);
 
             if (result.success) {
                 console.log("Transaction Approved:", result);
-                wixLocation.to('/thank-you');
+                wixLocationFrontend.to(successUrl);
             } else {
                 console.error("Transaction Failed:", result.error);
-                
-                // Show the error message on the page
-                $w("#errorText").text = result.error; 
+
+                // You can either show the error inline or redirect to the cancelUrl. 
+                // Here we redirect to the cancelUrl with the error message attached.
+                const errorCancelUrl = `${cancelUrl}&error=${encodeURIComponent(result.error || "Payment Failed")}`;
+                wixLocationFrontend.to(errorCancelUrl);
+
+                // Show the error message on the page (briefly visible before redirect)
+                $w("#errorText").text = result.error;
                 $w("#errorText").show();
 
                 $w("#payNow").label = "Pay Now";
