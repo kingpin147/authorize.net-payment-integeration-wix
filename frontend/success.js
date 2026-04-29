@@ -18,7 +18,7 @@ $w.onReady(function () {
     // 2. Update UI based on the status
     // We only use #statusHeading and #detailsText
 
-    if (status && status.startsWith("success")) {
+    if (status === "success") {
         // Success Mode
         $w("#statusHeading").text = "Payment Successful! 🎉";
         
@@ -29,7 +29,7 @@ $w.onReady(function () {
             $w("#detailsText").hide();
         }
 
-    } else if (status && status.startsWith("failed")) {
+    } else if (status === "failed") {
         // Failed Mode
         $w("#statusHeading").text = "Payment Failed ❌";
         
