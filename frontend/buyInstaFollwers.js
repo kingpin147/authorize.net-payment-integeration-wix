@@ -466,8 +466,8 @@ function initCheckout() {
         try {
             //https://www.sparkyourinsta.com/thank-you
             const descriptionText = `${selectedPackage} for ${username}`;
-            const successUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&status=success`;
-            const cancelUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&status=failed`;
+            const successUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=success`;
+            const cancelUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=failed`;
 
             const paymentData = {
                 amount: amount,

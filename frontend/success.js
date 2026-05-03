@@ -12,6 +12,8 @@ $w.onReady(function () {
     const rawDescription = getParam(query.description);
     const description = rawDescription ? decodeURIComponent(rawDescription) : "";
     const amount = getParam(query.amount);
+    const rawEmail = getParam(query.email);
+    const email = rawEmail ? decodeURIComponent(rawEmail) : "";
     const rawError = getParam(query.error);
     const errorMsg = rawError ? decodeURIComponent(rawError) : "";
 
@@ -62,6 +64,7 @@ $w.onReady(function () {
             status: status,
             description: description,
             amount: amount,
+            email: email || null,
             error: errorMsg || null
         };
 
