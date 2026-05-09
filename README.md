@@ -1,43 +1,42 @@
-# Authorize.Net Wix Velo Integration (Direct On-Site Checkout)
+# Authorize.Net Wix Velo Integration (Checkout & Cart System)
 
-A high-performance, production-ready integration for Authorize.Net within the Wix Velo environment. This project evolved from a redirect-based system to a fully integrated, on-site payment experience.
+A high-performance, production-ready integration for Authorize.Net within the Wix Velo environment. This project features a session-based shopping cart and a dedicated, on-site secure checkout experience.
 
 ---
 
-## 🚀 Project Evolution
+## 🚀 Project Architecture
 
-### Scenario 1: The Redirect Method (Legacy)
+### 1. The Cart System
+- **How it works:** Users browse services on `frontend/buyInstaFollwers.js`. Clicking "Add to Cart" or "Continue" saves their selected packages into a `sessionStorage` array (`serviceCart`) and triggers a Wix Lightbox (`ServiceCart`).
+- **Benefit:** Allows for multiple packages to be purchased in a single transaction.
 
-Initially, the project used the **Authorize.Net Accept Hosted** flow. 
+### 2. The Direct Checkout Page
+- **How it works:** Users proceed to a dedicated `/checkout` page managed by `frontend/checkout.js`. The page loads all session items and calculates the total.
+- **Processing:** The page securely collects Card Number, CVC, and Expiry Date. The data is securely sent to the Wix backend (`backend/authorizeIntegration.jsw`), processed via Authorize.Net's Direct XML API, and a success/fail response is returned instantly without the user ever leaving the domain.
 
-- **How it worked:** Users were redirected to a secure Authorize.Net-hosted page via a custom "bridge" page (`_functions/authorizeRedirect`).
-- **Why it changed:** The client felt that redirecting users to a third-party domain (even for security) broke the premium brand experience and decreased conversion rates.
-
-### Scenario 2: The Direct Method (Final Choice)
-
-We implemented a **Direct API (AIM/XML)** integration that allows the entire transaction to happen on the website.
-
-- **How it works:** A multi-state checkout box collects customer details and card information. The data is sent securely to the Wix backend, processed via Authorize.Net's Direct XML API, and a success/fail response is shown instantly.
-- **Result:** **This is what the client finally liked.** It provides a seamless, professional experience where the customer never leaves the `sparkyourinsta.com` domain.
+### 3. The Thank You / Order Details Page
+- **How it works:** Upon a successful transaction, the user is redirected to the `/thank-you` page (`frontend/thankYou.js`). The checkout page constructs a URL with detailed query parameters (Order Number, Name, Email, Packages, Amount).
+- **UI:** The Thank You page parses these parameters to display a formatted, invoice-like summary (`#orderDetails`) and runs a dummy processing animation (`#progressBar1`) for a premium user experience. It also stores the finalized order in the Wix CMS `OrderDetails` collection.
 
 ---
 
 ## 📂 Key Components
 
-- **`frontend/buyInstaFollwers.js`**: Controls the multi-state checkout UI (Package Selection -> Details -> Card Info). Handles frontend validation and error display.
+- **`frontend/buyInstaFollwers.js`**: Controls service selection, adds items to the session cart, and opens the ServiceCart Lightbox.
+- **`frontend/ServiceCart.js`**: A Lightbox component that reads the `serviceCart` session, allows item removal, and routes users to the checkout page.
+- **`frontend/checkout.js`**: Dedicated checkout page. Retrieves session cart, builds the Authorize.Net payload, handles API communication, and clears the cart upon success.
+- **`frontend/thankYou.js`**: Parses URL query parameters to dynamically generate an invoice summary. Logs completed orders to the database.
 - **`backend/authorizeIntegration.jsw`**: The consolidated backend service. It handles XML payload construction, `xml2js` response parsing, and database logging.
-- **`backend/payment.jsw`**: A legacy wrapper used for testing direct transactions.
-- **`frontend/success.js`**: Parses URL query parameters (`status`, `description`, `amount`, `error`) on the Thank You page to dynamically show success or failure details.
 
 ---
 
 ## 🛠️ Technical Features
 
-- **On-Site Payment Form**: Custom UI for Card Number, CVC, and Expiration Date inside a Wix Multi-State Box.
-- **Robust Error Handling**: Real-time feedback for declines, expired cards, or incorrect CVCs displayed via the `#errorText` element.
-- **Database Logging**: Every step (Initiated, Result, Exception) is logged to a `logs` CMS collection for audit trails and customer support.
-- **PCI Security**: Sensitive card data is processed but **never saved** to the database, ensuring security and compliance.
-- **Production Endpoint**: Configured for `api.authorize.net` with live environment toggling.
+- **Session Storage Cart**: Dynamic shopping cart that persists across the session without requiring user authentication.
+- **On-Site Payment Form**: Seamless Authorize.Net integration on a native Wix page.
+- **Robust Error Handling**: Real-time feedback for declines, expired cards, or incorrect CVCs.
+- **Database Logging**: Every transaction step is logged. Successful orders are saved to `Orders` and `OrderDetails` CMS collections.
+- **PCI Security**: Sensitive card data is processed directly via backend secure calls but **never saved** to the database.
 
 ---
 
@@ -50,19 +49,18 @@ The following production credentials must be stored:
 - `transactionKey`: Your Live Authorize.Net Transaction Key.
 
 ### 2. UI Element IDs
-The `buyInstaFollwers.js` logic expects the following IDs in the Wix Editor:
+Ensure the following IDs are set in your Wix Editor:
 
-- **Details State:** `#userName`, `#emailInput`, `#buyNow` (Continue button).
-- **Card State:** `#cardNumber`, `#cardCvc`, `#expirationMonth`, `#expirationYear`, `#payNow`.
-- **Feedback:** `#errorText` (Text element for decline messages).
-- **Thank You Page:** `#statusHeading`, `#detailsText` (Used by `success.js` to display the final payment status and summary).
+- **Checkout Page:** `#cardName`, `#cardNumber`, `#cardCvc`, `#expirationMonth`, `#expirationYear`, `#zipCode`, `#payNow`, `#errorText`, `#checkoutRepeater` (for displaying items).
+- **Thank You Page:** `#statusHeading`, `#orderDetails` (Text element for invoice), `#progressBar1` (Progress bar component).
 
 ### 3. Workflow Flow
 
-1. **Selection:** User picks a package in the repeater.
-2. **Details:** User enters Instagram handle and email.
-3. **Payment:** User enters card details on the same page.
-4. **Completion:** On success or failure, the user is redirected to `/thank-you` with dynamic URL parameters that show the outcome.
+1. **Selection:** User selects a package and clicks Buy Now or Add to Cart.
+2. **Cart:** Item is saved to `sessionStorage` and user views the ServiceCart lightbox.
+3. **Checkout:** User navigates to `/checkout`, enters payment details.
+4. **Processing:** Authorize.Net processes the payload; on success, the cart clears.
+5. **Completion:** User is redirected to `/thank-you` to view their dynamically generated invoice.
 
 ---
 

@@ -1,6 +1,8 @@
- import wixLocationFrontend from 'wix-location-frontend';
+import wixLocationFrontend from 'wix-location-frontend';
 import wixData from 'wix-data';
+import { session } from 'wix-storage';
 import { createTransaction } from 'backend/authorizeIntegration';
+import wixWindow from 'wix-window';
 
 /* =====================================
    GLOBAL SELECTION STORAGE
@@ -70,7 +72,7 @@ $w.onReady(function () {
     detectStateFromURL();
     initRepeaters();
     initBuyButtons();
-
+initAddToCartButtons();
     filterFollowersPackages("real followers");
     filterLikesPackages("Real Likes");
     filterViewsPackages("Views");
@@ -192,9 +194,7 @@ function setupRepeater(type) {
             setSelected(type, itemData);
             refreshRepeaterSelection(type);
             updatePriceUI(type);
-$w('#DiscountedPriceDetails').text=itemData.discountedPrice.toString()
-$w('#actualPriceDetails').text=itemData.price.toString()
-$w('#saveTextDetails').text=itemData.discountedPrice.toString()
+
         });
 
     });
@@ -265,10 +265,7 @@ function updatePriceUI(type) {
     $w(config.discounted).text = `$${price.toFixed(2)}`;
     $w(config.original).text = `$${original.toFixed(2)}`;
     $w(config.save).text = `You Save $${savings}`;
-    $w('#DiscountedPriceDetails').text=`$${price.toFixed(2)}`;
-$w('#actualPriceDetails').text=`$${original.toFixed(2)}`;
-$w('#saveTextDetails').text=`You Save $${savings}`;
- 
+   
 
 
 }
@@ -426,20 +423,142 @@ function initCheckout() {
     });
 
     // 2. Handle the "Continue" button in Details state (switches to Card state)
-    $w("#buyNow").onClick(() => {
-        const username = $w("#userName").value;
-        const email = $w("#emailInput").value;
+    // $w("#buyNow").onClick(() => {
+    //     const username = $w("#userName").value;
+    //     const email = $w("#emailInput").value;
 
-        if (!email || !username) {
-            // Simple validation feedback
-            $w("#userName").scrollTo();
-            return;
+    //     if (!email || !username) {
+    //         // Simple validation feedback
+    //         $w("#userName").scrollTo();
+    //         return;
+    //     }
+
+    //     // Switch to the new 'card' state you added
+    //     $w("#instaStateBox").changeState("card");
+    // });
+$w("#buyNow").onClick(() => {
+
+    const username =
+        $w("#userName").value;
+
+    const email =
+        $w("#emailInput").value;
+
+    const packageName =
+        $w("#packageDropdown").value;
+
+    if (!email || !username) {
+
+        $w("#userName").scrollTo();
+        return;
+
+    }
+
+    const activeSection =
+        getActiveSection();
+
+    const selected =
+        selectedItems[activeSection];
+
+    if (
+        !selected ||
+        !selected.price
+    ) {
+
+        console.log(
+            "No package selected"
+        );
+
+        return;
+
+    }
+
+    let cart = [];
+
+    try {
+
+        const existingCart =
+            session.getItem(
+                "serviceCart"
+            );
+
+        if (existingCart) {
+
+            cart = JSON.parse(
+                existingCart
+            );
+
+            if (
+                !Array.isArray(cart)
+            ) {
+
+                cart = [];
+
+            }
+
         }
 
-        // Switch to the new 'card' state you added
-        $w("#instaStateBox").changeState("card");
-    });
+    } catch (err) {
 
+        console.log(
+            "Cart parse error:",
+            err
+        );
+
+        cart = [];
+
+    }
+
+    const uniqueId =
+        `${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
+
+    const item = {
+
+        _id: uniqueId,
+
+        cartId: uniqueId,
+
+        username: username,
+
+        email: email,
+
+        serviceType:
+            activeSection,
+
+        packageName:
+            packageName,
+
+        price:
+            Number(
+                selected.price
+            ) || 0,
+
+        original:
+            Number(
+                selected.original
+            ) || 0
+
+    };
+
+    cart.push(item);
+
+    session.setItem(
+        "serviceCart",
+        JSON.stringify(cart)
+    );
+
+    console.log(
+        "UPDATED CART:",
+        cart
+    );
+
+    wixLocationFrontend.to(
+        "/checkout"
+    );
+
+});
     // 3. Handle the final Pay Now button in Card state
     $w("#payNow").onClick(async () => {
         const username = $w("#userName").value;
@@ -527,4 +646,98 @@ function getActiveSection() {
         if (selectedItems.automaticLikes.id) return "automaticLikes";
     }
     return "followers";
+}
+
+/* =====================================
+   SERVICE ADD TO CART
+===================================== */
+
+
+function initAddToCartButtons() {
+
+    $w("#addToCartFollowers")
+        .onClick(() => addServiceToCart("followers"));
+
+    $w("#addToCartLikes")
+        .onClick(() => addServiceToCart("likes"));
+
+    $w("#addToCartViews")
+        .onClick(() => addServiceToCart("views"));
+
+    $w("#addToCartAutomaticLikes")
+        .onClick(() => addServiceToCart("automaticLikes"));
+
+}
+
+function addServiceToCart(type) {
+
+    const selected = selectedItems[type];
+
+    if (!selected || !selected.id) {
+
+        console.log("No package selected");
+        return;
+
+    }
+
+    let cart = [];
+
+    try {
+
+        const existingCart =
+            session.getItem("serviceCart");
+
+        if (existingCart) {
+
+            cart = JSON.parse(existingCart);
+
+            if (!Array.isArray(cart)) {
+                cart = [];
+            }
+
+        }
+
+    } catch (err) {
+
+        console.log("Cart parse error:", err);
+
+        cart = [];
+
+    }
+
+    const uniqueId =
+        `${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
+
+    const item = {
+
+        _id: uniqueId,
+
+        cartId: uniqueId,
+
+        serviceType: type,
+
+        packageName: selected.package || "",
+
+        price: Number(selected.price) || 0,
+
+        original: Number(selected.original) || 0
+
+    };
+
+    cart.push(item);
+
+    session.setItem(
+        "serviceCart",
+        JSON.stringify(cart)
+    );
+
+    console.log(
+        "UPDATED CART:",
+        cart
+    );
+
+    wixWindow.openLightbox("ServiceCart");
+
 }
