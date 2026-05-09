@@ -15,8 +15,8 @@ A high-performance, production-ready integration for Authorize.Net within the Wi
 - **Processing:** The page securely collects Card Number, CVC, and Expiry Date. The data is securely sent to the Wix backend (`backend/authorizeIntegration.jsw`), processed via Authorize.Net's Direct XML API, and a success/fail response is returned instantly without the user ever leaving the domain.
 
 ### 3. The Thank You / Order Details Page
-- **How it works:** Upon a successful transaction, the user is redirected to the `/thank-you` page (`frontend/thankYou.js`). The checkout page constructs a URL with detailed query parameters (Order Number, Name, Email, Packages, Amount).
-- **UI:** The Thank You page parses these parameters to display a formatted, invoice-like summary (`#orderDetails`) and runs a dummy processing animation (`#progressBar1`) for a premium user experience. It also stores the finalized order in the Wix CMS `OrderDetails` collection.
+- **How it works:** Upon a successful transaction, the user is redirected to the `/thank-you` page (`frontend/thankYou.js`). The checkout page constructs a URL with detailed query parameters (Order Number, Name, Email, Packages, Amount, and a JSON-structured `lineItems` array).
+- **UI:** The Thank You page parses these parameters to display a dynamically generated invoice using distinct UI elements (`#orderNumber`, `#dateText`, `#totalPrice`) and populates the line items into a `#servicesRepeater` element for a premium user experience. It also stores the finalized order in the Wix CMS `OrderDetails` collection.
 
 ---
 
@@ -52,7 +52,7 @@ The following production credentials must be stored:
 Ensure the following IDs are set in your Wix Editor:
 
 - **Checkout Page:** `#cardName`, `#cardNumber`, `#cardCvc`, `#expirationMonth`, `#expirationYear`, `#zipCode`, `#payNow`, `#errorText`, `#checkoutRepeater` (for displaying items).
-- **Thank You Page:** `#statusHeading`, `#orderDetails` (Text element for invoice), `#progressBar1` (Progress bar component).
+- **Thank You Page:** `#statusHeading`, `#orderNumber`, `#dateText`, `#totalPrice`, `#servicesRepeater` (for line items).
 
 ### 3. Workflow Flow
 

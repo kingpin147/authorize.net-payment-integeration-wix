@@ -33,24 +33,53 @@ $w.onReady(function () {
     if (status === "success") {
         $w("#statusHeading").text = "Payment Successful! 🎉";
         
-        const today = new Date().toLocaleDateString('en-US');
+        const today = new Date().toLocaleDateString('en-GB');
+
+        $w("#orderNumber").text = `Order #${orderNumber}`;
+        $w("#dateText").text = today;
+        $w("#totalPrice").text = `$${amount}`;
+
+        let packageList = packages ? packages.split(",").map(p => p.trim()) : [];
+        let priceList = servicesPrice ? servicesPrice.split(",").map(p => p.trim()) : [];
+
+        let repeaterData = [];
         
-        // Format packages and prices cleanly
-        let packagesDisplay = packages;
-        if (packages.includes(",")) {
-            packagesDisplay = packages.split(",").map(p => p.trim()).join("\n");
+        const lineItemsParam = getParam(query.lineItems) ? decodeURIComponent(getParam(query.lineItems)) : "";
+        if (lineItemsParam) {
+            try {
+                const parsedItems = JSON.parse(lineItemsParam);
+                repeaterData = parsedItems.map((item, index) => ({
+                    "_id": `item-${index}`,
+                    "serviceName": item.name,
+                    "servicePrice": item.price
+                }));
+            } catch (e) {
+                console.error("Failed to parse lineItems", e);
+            }
+        }
+        
+        // Fallback to old comma-separated logic if lineItems parsing failed or is empty
+        if (repeaterData.length === 0) {
+            repeaterData = packageList.map((pkg, index) => {
+                let price = priceList[index] || amount;
+                if (price && !price.startsWith('$')) {
+                    price = `$${price}`;
+                }
+                return {
+                    "_id": `item-${index}`,
+                    "serviceName": pkg,
+                    "servicePrice": price
+                };
+            });
         }
 
-        // Format order details similar to your reference image using tabs for spacing
-        const detailsString = 
-`${orderNumber} \t\t\t\t\t\t\t\t ${today}
+        $w("#servicesRepeater").onItemReady(($item, itemData) => {
+            $item("#serviceName").text = itemData.serviceName;
+            $item("#servicePrice").text = itemData.servicePrice;
+        });
 
-${packagesDisplay} \t\t\t\t\t\t\t\t $${amount}
-
-Total \t\t\t\t\t\t\t\t\t\t $${amount}`;
-
-        $w("#orderDetails").text = detailsString;
-        $w("#orderDetails").show();
+        $w("#servicesRepeater").data = repeaterData;
+        $w("#servicesRepeater").show();
     } else if (status === "failed") {
         $w("#statusHeading").text = "Payment Failed ❌";
         

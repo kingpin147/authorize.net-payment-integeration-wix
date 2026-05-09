@@ -87,6 +87,12 @@ async function handlePayment() {
         const packageNames = cartItems.map(item => item.packageName).join(", ");
         const servicesPrices = cartItems.map(item => `$${Number(item.price).toFixed(2)}`).join(", ");
         
+        // Create a structured line items array for the thank you page
+        const lineItemsStr = JSON.stringify(cartItems.map(item => ({
+            name: item.packageName,
+            price: `$${Number(item.price).toFixed(2)}`
+        })));
+        
         // Pick the email/username from the first cart item that has them
         const emailItem = cartItems.find(item => item.email) || {};
         const email = emailItem.email || "";
@@ -95,8 +101,8 @@ async function handlePayment() {
 
         const descriptionText = packageNames;
 
-        const successUrl = `https://www.sparkyourinsta.com/thank-you?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&packages=${encodeURIComponent(packageNames)}&servicesPrice=${encodeURIComponent(servicesPrices)}&amount=${checkoutTotal}&orderNumber=${orderNumber}&status=success`;
-        const cancelUrl = `https://www.sparkyourinsta.com/thank-you?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&packages=${encodeURIComponent(packageNames)}&servicesPrice=${encodeURIComponent(servicesPrices)}&amount=${checkoutTotal}&orderNumber=${orderNumber}&status=failed`;
+        const successUrl = `https://www.sparkyourinsta.com/thank-you?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&packages=${encodeURIComponent(packageNames)}&servicesPrice=${encodeURIComponent(servicesPrices)}&lineItems=${encodeURIComponent(lineItemsStr)}&amount=${checkoutTotal}&orderNumber=${orderNumber}&status=success`;
+        const cancelUrl = `https://www.sparkyourinsta.com/thank-you?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&packages=${encodeURIComponent(packageNames)}&servicesPrice=${encodeURIComponent(servicesPrices)}&lineItems=${encodeURIComponent(lineItemsStr)}&amount=${checkoutTotal}&orderNumber=${orderNumber}&status=failed`;
 
         // Determine if expYear is 2 or 4 digits
         const formattedYear = expYear.length === 2 ? `20${expYear}` : expYear;
