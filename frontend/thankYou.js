@@ -1,7 +1,7 @@
 import wixLocationFrontend from 'wix-location-frontend';
 import wixData from 'wix-data';
 
-$w.onReady(function () {
+$w.onReady(async function () {
     // 1. Get query parameters from the URL
     const query = wixLocationFrontend.query;
     
@@ -102,7 +102,7 @@ $w.onReady(function () {
     }
 
     // 4. Insert order details into the Wix CMS 'OrderDetails' collection
-    if (status) {
+    if (status && orderNumber) {
         const orderData = {
             status: status,
             description: packages,
@@ -113,12 +113,19 @@ $w.onReady(function () {
             error: errorMsg || null
         };
 
-        wixData.insert("OrderDetails", orderData)
-            .then((result) => {
+        try {
+            const results = await wixData.query("OrderDetails")
+                .eq("orderNumber", orderNumber)
+                .find();
+
+            if (results.items.length === 0) {
+                const result = await wixData.insert("OrderDetails", orderData);
                 console.log("Order details successfully inserted:", result);
-            })
-            .catch((err) => {
-                console.error("Failed to insert order details:", err);
-            });
+            } else {
+                console.log("Order already exists. Skipping insertion to prevent duplicate.");
+            }
+        } catch (err) {
+            console.error("Error processing order details:", err);
+        }
     }
 });

@@ -585,8 +585,9 @@ $w("#buyNow").onClick(() => {
         try {
             //https://www.sparkyourinsta.com/thank-you
             const descriptionText = `${selectedPackage} for ${username}`;
-            const successUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=success`;
-            const cancelUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=failed`;
+            const orderNumber = "ORD-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+            const successUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=success&orderNumber=${orderNumber}`;
+            const cancelUrl = `https://www.sparkyourinsta.com/thank-you?description=${encodeURIComponent(descriptionText)}&amount=${amount}&email=${encodeURIComponent(email)}&status=failed&orderNumber=${orderNumber}`;
 
             const paymentData = {
                 amount: amount,
